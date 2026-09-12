@@ -4,55 +4,59 @@ import moment from "moment";
 import random from "random";
 
 // =============================================================
-// CONFIGURATION: Auto Contribution Generator (2024 - 2026)
+// CONFIGURATION: Boost Contributions for 2024 & 2025 Only
 // =============================================================
 const START_DATE = "2024-01-01";
-const END_DATE = moment().format("YYYY-MM-DD"); // up to today in 2026
-const WEEKDAY_PROBABILITY = 0.82; // 82% of weekdays will have activity
-const WEEKEND_PROBABILITY = 0.50; // 50% of weekends will have activity
-const AUTO_PUSH = true;          // Automatically push to origin/main when done
+const END_DATE = "2025-12-31";    // Only boost 2024 and 2025 (leave 2026 untouched)
+const WEEKDAY_PROBABILITY = 0.88; // 88% chance of activity on weekdays
+const WEEKEND_PROBABILITY = 0.65; // 65% chance on weekends
+const AUTO_PUSH = true;
 
 /**
- * Returns a random number of commits for an active day
- * Gives a realistic mix of light green, medium green, and bright green
+ * Returns a commit count per day for a solid, vibrant green look
  */
 function getCommitCountForDay(isWeekend) {
   if (isWeekend) {
-    // Weekends: lighter activity (1 to 4 commits)
-    return random.float(0, 1) < 0.70 ? random.int(1, 2) : random.int(3, 4);
+    return random.int(2, 4); // 2 to 4 commits on weekends
   }
 
-  // Weekdays: richer activity (1 to 8 commits)
+  // Weekdays: heavier activity (2 to 9 commits)
   const roll = random.float(0, 1);
-  if (roll < 0.35) return random.int(1, 2);      // Light green
-  if (roll < 0.80) return random.int(3, 5);      // Medium green
-  return random.int(6, 8);                       // Dark / vibrant green
+  if (roll < 0.30) return random.int(2, 3);
+  if (roll < 0.80) return random.int(4, 6);
+  return random.int(7, 9);
 }
 
-async function generateContributions() {
+async function boost2024And2025Contributions() {
   console.log("==================================================");
-  console.log("🚀 GitHub Contribution Generator (2024 - 2026)");
-  console.log(`📅 Date Range: ${START_DATE} to ${END_DATE}`);
+  console.log("🚀 Boosting Contributions for 2024 & 2025");
+  console.log(`📅 Target Date Range: ${START_DATE} to ${END_DATE}`);
+  console.log("ℹ️  2026 is left unchanged as requested.");
   console.log("==================================================");
 
-  // 1. Prepare Git Tree & Parent
+  // Load existing data.json stats if available
+  let previousSummary = {};
+  try {
+    previousSummary = JSON.parse(fs.readFileSync("./data.json", "utf-8"));
+  } catch (e) {
+    previousSummary = { totalCommits: 0, yearBreakdown: {} };
+  }
+
   const tree = execFileSync("git", ["write-tree"]).toString().trim();
   let parent = execFileSync("git", ["rev-parse", "HEAD"]).toString().trim();
 
-  let totalCommits = 0;
+  let totalNewCommits = 0;
   let activeDays = 0;
   let totalDays = 0;
-  const yearCounts = {};
+  const newYearCounts = { "2024": 0, "2025": 0 };
 
   const current = moment(START_DATE);
   const end = moment(END_DATE);
-
   const startTime = Date.now();
 
-  // 2. Iterate through every single day from 2024 to 2026
   while (current.isSameOrBefore(end, "day")) {
     totalDays++;
-    const dayOfWeek = current.day(); // 0 = Sun, 6 = Sat
+    const dayOfWeek = current.day();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const chance = isWeekend ? WEEKEND_PROBABILITY : WEEKDAY_PROBABILITY;
 
@@ -60,13 +64,13 @@ async function generateContributions() {
       activeDays++;
       const commitCount = getCommitCountForDay(isWeekend);
       const year = current.format("YYYY");
-      yearCounts[year] = (yearCounts[year] || 0) + commitCount;
+      newYearCounts[year] = (newYearCounts[year] || 0) + commitCount;
 
       for (let i = 0; i < commitCount; i++) {
-        totalCommits++;
+        totalNewCommits++;
 
-        // Generate realistic commit timestamps between 09:00 and 22:00
-        const hour = random.int(9, 21);
+        // Natural timestamp between 08:30 and 22:45
+        const hour = random.int(8, 22);
         const minute = random.int(0, 59);
         const second = random.int(0, 59);
         const commitTime = current.clone().hour(hour).minute(minute).second(second);
@@ -93,62 +97,70 @@ async function generateContributions() {
       }
     }
 
-    // Print progress every 100 days
     if (totalDays % 100 === 0 || current.isSame(end, "day")) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(
-        `⏳ [${current.format("YYYY-MM-DD")}] Processed ${totalDays} days | ${totalCommits} commits generated (${elapsed}s)...`
+        `⏳ [${current.format("YYYY-MM-DD")}] Processed ${totalDays}/${731} days | +${totalNewCommits} commits added (${elapsed}s)...`
       );
     }
 
     current.add(1, "day");
   }
 
-  // 3. Update data.json with generation summary
-  const summary = {
-    status: "GitHub contributions generated",
-    startDate: START_DATE,
-    endDate: END_DATE,
-    totalDays,
-    activeDays,
-    totalCommits,
-    yearBreakdown: yearCounts,
-    generatedAt: moment().format(),
+  // Calculate cumulative stats
+  const prevBreakdown = previousSummary.yearBreakdown || {};
+  const cumulativeYearBreakdown = {
+    "2024": (prevBreakdown["2024"] || 0) + (newYearCounts["2024"] || 0),
+    "2025": (prevBreakdown["2025"] || 0) + (newYearCounts["2025"] || 0),
+    "2026": prevBreakdown["2026"] || 662, // unchanged
   };
 
-  fs.writeFileSync("./data.json", JSON.stringify(summary, null, 2));
+  const cumulativeTotalCommits =
+    (previousSummary.totalCommits || 0) + totalNewCommits;
 
-  // 4. Update local branch ref to the new head
+  const updatedSummary = {
+    status: "Boosted contributions for 2024 & 2025 (2026 preserved)",
+    boostRange: `${START_DATE} to ${END_DATE}`,
+    newCommitsAdded: totalNewCommits,
+    cumulativeTotalCommits,
+    yearBreakdown: cumulativeYearBreakdown,
+    updatedAt: moment().format(),
+  };
+
+  fs.writeFileSync("./data.json", JSON.stringify(updatedSummary, null, 2));
+
+  // Update git ref to new head
   execFileSync("git", ["update-ref", "refs/heads/main", parent]);
 
-  // Stage and commit the final summary in data.json
+  // Stage and commit data.json & index.js
   execFileSync("git", ["add", "data.json", "index.js"]);
-  execFileSync("git", ["commit", "-m", `Generate ${totalCommits} contributions for 2024-2026`]);
+  execFileSync("git", [
+    "commit",
+    "-m",
+    `Boost 2024 and 2025 with +${totalNewCommits} contributions`,
+  ]);
 
   console.log("\n==================================================");
-  console.log("🎉 Contribution Generation Complete!");
-  console.log(`📊 Total Commits Created: ${totalCommits}`);
-  console.log(`📅 Active Days: ${activeDays} / ${totalDays}`);
-  console.log("📈 Contributions by Year:");
-  Object.keys(yearCounts).sort().forEach((yr) => {
-    console.log(`   • ${yr}: ${yearCounts[yr]} contributions`);
-  });
+  console.log("🎉 Boost Complete!");
+  console.log(`➕ New Commits Added: +${totalNewCommits}`);
+  console.log(`📈 New Contributions Breakdown:`);
+  console.log(`   • 2024: +${newYearCounts["2024"]} added (Total: ~${cumulativeYearBreakdown["2024"]})`);
+  console.log(`   • 2025: +${newYearCounts["2025"]} added (Total: ~${cumulativeYearBreakdown["2025"]})`);
+  console.log(`   • 2026: 0 added (Total: ~${cumulativeYearBreakdown["2026"]} - untouched)`);
+  console.log(`📦 Cumulative Total Commits: ${cumulativeTotalCommits}`);
   console.log("==================================================");
 
-  // 5. Push to GitHub
   if (AUTO_PUSH) {
-    console.log("\n⬆️  Pushing all contributions to GitHub (origin/main)...");
+    console.log("\n⬆️  Pushing updated contributions to GitHub (origin/main)...");
     try {
       execFileSync("git", ["push", "origin", "main"], { stdio: "inherit" });
-      console.log("\n✅ SUCCESS! All contributions have been pushed to GitHub.");
-      console.log("👉 Visit your profile: https://github.com/OpaleyeDaniel");
-      console.log("💡 Tip: It can take 5-10 minutes for GitHub's cache to re-render the green squares.");
+      console.log("\n✅ SUCCESS! All commits pushed to GitHub.");
+      console.log("👉 View your profile: https://github.com/OpaleyeDaniel");
+      console.log("💡 Tip: GitHub will update your 2024 and 2025 graphs in 5-10 minutes.");
     } catch (err) {
       console.error("❌ Error pushing to GitHub:", err.message);
-      console.log("You can manually push anytime by running: git push origin main");
     }
   }
 }
 
-// Run generator
-generateContributions().catch(console.error);
+boost2024And2025Contributions().catch(console.error);
